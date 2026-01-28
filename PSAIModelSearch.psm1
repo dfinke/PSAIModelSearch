@@ -1,5 +1,60 @@
 # PSAIModelSearch PowerShell module
 
+function Convert-ToDateTimeIfPossible {
+    param($Value)
+    if ($Value -is [string]) {
+        try {
+            $parsed = [DateTime]::Parse($Value)
+            return $parsed
+        }
+        catch {
+            return $Value
+        }
+    }
+    return $Value
+}
+
+function Format-Modalities {
+    param(
+        $Modalities,
+        [string]$Key
+    )
+
+    if ($null -eq $Modalities) { return '' }
+
+    $value = $Modalities.$Key
+    if ($value -is [System.Collections.IEnumerable] -and -not ($value -is [string])) {
+        return ($value | ForEach-Object { $_.ToString() }) -join ', '
+    }
+
+    if ($null -ne $value) { return $value.ToString() }
+    return ''
+}
+
+function Format-ModelsTable {
+    param(
+        $Models
+    )
+
+    $Models |
+    Sort-Object provider_name, id |
+    ForEach-Object {
+        [pscustomobject]@{
+            Provider   = $_.provider_name
+            Model      = $_.name
+            Family     = $_.family
+            ProviderId = $_.provider_id
+            ModelId    = $_.id
+            ToolCall   = if ($null -ne $_.tool_call) { $_.tool_call } else { '' }
+            Reasoning  = if ($null -ne $_.reasoning) { $_.reasoning } else { '' }
+            Input      = Format-Modalities -Modalities $_.modalities -Key 'input'
+            Output     = Format-Modalities -Modalities $_.modalities -Key 'output'
+            InputCost  = if ($null -ne $_.cost -and $null -ne $_.cost.input) { $_.cost.input } else { '' }
+        }
+    } |
+    Format-Table -AutoSize
+}
+
 function Search-AIModel {
     <#
     .SYNOPSIS
@@ -59,20 +114,6 @@ function Search-AIModel {
 
         [string]$CachePath = (Join-Path $PSScriptRoot 'model.json')
     )
-
-    function Convert-ToDateTimeIfPossible {
-        param($Value)
-        if ($Value -is [string]) {
-            try {
-                $parsed = [DateTime]::Parse($Value)
-                return $parsed
-            }
-            catch {
-                return $Value
-            }
-        }
-        return $Value
-    }
 
     function Get-ModelsData {
         param(
@@ -340,4 +381,113 @@ function Search-AIModel {
     $matches
 }
 
-Export-ModuleMember -Function Search-AIModel
+function Get-AIModelsByReleaseDate {
+    <#
+    .SYNOPSIS
+    Retrieves AI models filtered by release date.
+
+    .DESCRIPTION
+    Fetches models from the models.dev API and filters them based on release date criteria.
+    Supports filtering by last N days, date range, or specific dates.
+
+    .PARAMETER LastDays
+    Return models released in the last N days.
+
+    .PARAMETER FromDate
+    Return models released on or after this date.
+
+    .PARAMETER ToDate
+    Return models released on or before this date.
+
+    .PARAMETER Refresh
+    Force refresh from remote endpoint even if cache exists.
+
+    .PARAMETER PassThru
+    Return full model objects instead of the summary table.
+
+    .PARAMETER Table
+    Output a formatted table similar to the models.dev UI.
+
+    .PARAMETER Deep
+    Perform deep recursive search across all nested fields (slower).
+
+    .PARAMETER Fields
+    Top-level fields to search when not using -Deep (faster).
+
+    .PARAMETER FlatCachePath
+    Path to flattened cache (CLIXML). Defaults to model-flat.clixml next to this module.
+
+    .PARAMETER NoFlatCache
+    Disable flattened cache usage.
+
+    .PARAMETER CachePath
+    Path to cache file. Defaults to model.json alongside this module.
+    #>
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory = $false)]
+        [int]$LastDays,
+
+        [Parameter(Mandatory = $false)]
+        [DateTime]$FromDate,
+
+        [Parameter(Mandatory = $false)]
+        [DateTime]$ToDate,
+
+        [switch]$Refresh,
+
+        [switch]$PassThru,
+
+        [switch]$Table,
+
+        [switch]$Deep,
+
+        [string[]]$Fields = @('id', 'name', 'provider_name', 'provider_id', 'family'),
+
+        [string]$FlatCachePath = (Join-Path $PSScriptRoot 'model-flat.clixml'),
+
+        [switch]$NoFlatCache,
+
+        [string]$CachePath = (Join-Path $PSScriptRoot 'model.json')
+    )
+
+    # Get all models
+    $allModels = Search-AIModel -Refresh:$Refresh -PassThru -Deep:$Deep -Fields $Fields -FlatCachePath $FlatCachePath -NoFlatCache:$NoFlatCache -CachePath $CachePath
+
+    # Filter by date
+    $filteredModels = $allModels | Where-Object {
+        $model = $_
+        $releaseDate = $model.release_date
+
+        # Skip if no release date
+        if ($null -eq $releaseDate -or -not ($releaseDate -is [DateTime])) {
+            return $false
+        }
+
+        $include = $true
+
+        if ($LastDays -gt 0) {
+            $cutoffDate = (Get-Date).AddDays(-$LastDays)
+            $include = $include -and ($releaseDate -ge $cutoffDate)
+        }
+
+        if ($PSBoundParameters.ContainsKey('FromDate')) {
+            $include = $include -and ($releaseDate -ge $FromDate)
+        }
+
+        if ($PSBoundParameters.ContainsKey('ToDate')) {
+            $include = $include -and ($releaseDate -le $ToDate)
+        }
+
+        return $include
+    }
+
+    if ($Table -and -not $PassThru) {
+        Format-ModelsTable -Models $filteredModels
+        return
+    }
+
+    $filteredModels
+}
+
+Export-ModuleMember -Function Search-AIModel, Get-AIModelsByReleaseDate
