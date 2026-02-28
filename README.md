@@ -89,6 +89,17 @@ Search-AIModel -Query "claude" -Refresh
 
 Searches for AI models by substring matching across specified fields.
 
+**Parameters:**
+- **Query**: Search string (case-insensitive substring match). If omitted, returns all models.
+- **Refresh**: Force refresh from remote API
+- **PassThru**: Return raw objects (default when not using -Table)
+- **Table**: Output formatted table instead of objects
+- **Deep**: Perform deep recursive search across all fields
+- **Fields**: Specify fields to search (default: id, name, provider_name, provider_id, family)
+- **FlatCachePath**: Path to CLIXML cache file
+- **NoFlatCache**: Disable CLIXML caching
+- **CachePath**: Path to JSON cache file
+
 ### Get-AIModelsByReleaseDate
 
 Filters AI models by their release dates, supporting relative (last N days) and absolute date ranges.
