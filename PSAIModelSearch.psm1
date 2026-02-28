@@ -483,7 +483,24 @@ function Get-AIModelsByReleaseDate {
     }
 
     if ($Table -and -not $PassThru) {
-        Format-ModelsTable -Models $filteredModels
+        $filteredModels |
+        Sort-Object release_date, provider_name, id |
+        ForEach-Object {
+            [pscustomobject]@{
+                ReleaseDate = if ($_.release_date -is [DateTime]) { $_.release_date.ToString('yyyy-MM-dd') } else { '' }
+                Provider    = $_.provider_name
+                Model       = $_.name
+                Family      = $_.family
+                ProviderId  = $_.provider_id
+                ModelId     = $_.id
+                ToolCall    = if ($null -ne $_.tool_call) { $_.tool_call } else { '' }
+                Reasoning   = if ($null -ne $_.reasoning) { $_.reasoning } else { '' }
+                Input       = Format-Modalities -Modalities $_.modalities -Key 'input'
+                Output      = Format-Modalities -Modalities $_.modalities -Key 'output'
+                InputCost   = if ($null -ne $_.cost -and $null -ne $_.cost.input) { $_.cost.input } else { '' }
+            }
+        } |
+        Format-Table -AutoSize
         return
     }
 
