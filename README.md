@@ -53,11 +53,20 @@ Search-AIModel
 Search-AIModel -Query "gpt" -Table
 ```
 
-### Advanced Filtering
+### Date-Based Filtering
 
 ```powershell
-# Get models as objects and filter by date
-Search-AIModel -Query "gpt-4o" | Where-Object { $_.release_date -gt [DateTime]::Parse("1/1/2025") } | Format-Table
+# Get models released in the last 7 days
+Get-AIModelsByReleaseDate -LastDays 7
+
+# Get models released between specific dates
+Get-AIModelsByReleaseDate -FromDate "2025-10-01" -ToDate "2026-01-01"
+
+# Get models released since a specific date
+Get-AIModelsByReleaseDate -FromDate "2025-12-01"
+
+# Table output for recent models
+Get-AIModelsByReleaseDate -LastDays 10 -Table
 ```
 
 ### Deep Search
@@ -73,6 +82,40 @@ Search-AIModel -Query "openai" -Deep
 # Force refresh from remote API
 Search-AIModel -Query "claude" -Refresh
 ```
+
+## Functions
+
+### Search-AIModel
+
+Searches for AI models by substring matching across specified fields.
+
+**Parameters:**
+- **Query**: Search string (case-insensitive substring match). If omitted, returns all models.
+- **Refresh**: Force refresh from remote API
+- **PassThru**: Return raw objects (default when not using -Table)
+- **Table**: Output formatted table instead of objects
+- **Deep**: Perform deep recursive search across all fields
+- **Fields**: Specify fields to search (default: id, name, provider_name, provider_id, family)
+- **FlatCachePath**: Path to CLIXML cache file
+- **NoFlatCache**: Disable CLIXML caching
+- **CachePath**: Path to JSON cache file
+
+### Get-AIModelsByReleaseDate
+
+Filters AI models by their release dates, supporting relative (last N days) and absolute date ranges.
+
+**Parameters:**
+- **LastDays**: Return models released in the last N days
+- **FromDate**: Return models released on or after this date
+- **ToDate**: Return models released on or before this date
+- **Refresh**: Force refresh from remote API
+- **PassThru**: Return raw objects (default when not using -Table)
+- **Table**: Output formatted table instead of objects
+- **Deep**: Perform deep recursive search across all fields
+- **Fields**: Specify fields to search (default: id, name, provider_name, provider_id, family)
+- **FlatCachePath**: Path to CLIXML cache file
+- **NoFlatCache**: Disable CLIXML caching
+- **CachePath**: Path to JSON cache file
 
 ## Parameters
 
